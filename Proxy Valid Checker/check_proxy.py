@@ -2,40 +2,39 @@ import threading
 import queue
 import requests
 
-#This code write by Mohammad Ashraf Iqbal (https://github.com/MohammadAshrafIqbal)
+# Initialize a queue and a list for valid proxies
+proxy_queue = queue.Queue()
+working_proxies = []
 
-q = queue.Queue()
-valid_proxies = []
+# Read proxies from a file and load them into the queue
+with open("proxy_list.txt", "r") as file:
+    proxy_list = file.read().strip().split("\n")
+    for proxy in proxy_list:
+        proxy_queue.put(proxy)
 
-# Load proxies from file into queue
-with open("proxy_list.txt", "r") as f:
-    proxies = f.read().split("\n")
-    for p in proxies:
-        q.put(p)
-
-# Function to check proxies
-def check_proxy():
-    global q
-    while not q.empty():
-        proxy = q.get()
+# Function to test if proxies are valid
+def test_proxy():
+    global proxy_queue
+    while not proxy_queue.empty():
+        current_proxy = proxy_queue.get()
         try:
-            res = requests.get("http://ipinfo.io/json", proxies={"http": proxy, "https": proxy}, timeout=10)
-            if res.status_code == 200:
-                valid_proxies.append(proxy)
-                print("Valid proxy:", proxy)
-        except Exception as e:
-            print("Error with proxy:", proxy, e)
+            response = requests.get("http://ipinfo.io/json", proxies={"http": current_proxy, "https": current_proxy}, timeout=10)
+            if response.status_code == 200:
+                working_proxies.append(current_proxy)
+                print("Valid proxy found:", current_proxy)
+        except Exception as err:
+            print("Issue with proxy:", current_proxy, err)
 
-# Create threads to check proxies
+# Create a list to hold thread references
 threads = []
-for _ in range(20):  # You can adjust the number of threads based on your requirement
-    t = threading.Thread(target=check_proxy)
-    t.start()
-    threads.append(t)
+for _ in range(20):  # Number of concurrent threads can be adjusted
+    thread = threading.Thread(target=test_proxy)
+    thread.start()
+    threads.append(thread)
 
-# Wait for all threads to finish
-for t in threads:
-    t.join()
+# Wait for all threads to complete
+for thread in threads:
+    thread.join()
 
-print("All proxies checked.")
-print("Valid proxies:", valid_proxies)
+print("Proxy check complete.")
+print("Valid proxies:", working_proxies)
